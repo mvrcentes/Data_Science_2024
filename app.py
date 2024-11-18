@@ -64,7 +64,7 @@ except Exception as e:
 
 # Enriquecer el grafo con nombres de canciones
 json_path = "./spotify_million_playlist_dataset/data/mpd.slice.0-999.json"  # Cambiar según la ubicación del archivo JSON
-access_token = "BQDPgV1Jrddjzb7bTQtp-tstz9-ieNCHmZYu2TAQzDrsjZAp_n0rrv5VspwVpAWJekAhurc1W001ertFy5zA8CS5Ek6PWB4APKdIxZnlqGOr5fpUpvM"
+access_token = "BQBq0BuGdhFZGJkJKtKkShm5rbcNx8KX1C1U_wjX5WQ8Z72jl6XjXJiXpTDKM_Yizyn_BSBZKQCt3VLdVcRfbpVAYe7KQbvXnQ2NN1sfiLT9YWh_u8w"
 
 try:
     with open(json_path, "r") as file:
@@ -144,9 +144,27 @@ if selected_playlist:
             # Record the time taken for the current model
             elapsed_time = time.time() - start_time
             st.session_state.model_times[model_name] = elapsed_time
-            
-            # Display the time in the main app interface
-            st.write(f"Tiempo para '{model_name}': {elapsed_time:.2f} segundos")
+
+            # Recomendar canciones
+            playlist_track_set = set(playlist_tracks)
+            track_scores = {
+                track: np.linalg.norm(output[node_map[track]])
+                for track in small_graph.nodes
+                if small_graph.nodes[track]["node_type"] == "track" and track not in playlist_track_set
+            }
+            recommended_tracks = sorted(track_scores, key=track_scores.get, reverse=True)[:10]
+            # Consultar nombres de canciones desconocidas en recomendaciones
+            for track in recommended_tracks:
+                track_name = small_graph.nodes[track].get("track_name", "Desconocido")
+                if track_name == "Desconocido" and "spotify:track:" in track:
+                    track_name, artist_name = get_track_name(track, access_token)
+                    small_graph.nodes[track]["track_name"] = track_name
+                    small_graph.nodes[track]["artist_name"] = artist_name
+            st.write("Canciones Recomendadas:")
+            for track in recommended_tracks:
+                track_name = small_graph.nodes[track].get("track_name", "Desconocido")
+                artist_name = small_graph.nodes[track].get("artist_name", "Desconocido")
+                st.write(f"- {track_name} - {artist_name}")
 
             # Plot the comparative bar graph if there are at least two models
             if len(st.session_state.model_times) > 1:
