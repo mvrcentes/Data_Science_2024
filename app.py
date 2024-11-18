@@ -198,3 +198,13 @@ if selected_playlist:
         node_color="skyblue"
     )
     st.pyplot(plt)
+
+    # Graficos
+    st.header("Visualización de Graficos")
+    st.image("graphs/1.png", caption=" ", use_column_width=True)
+    st.image("graphs/2.png", caption=" ", use_column_width=True)
+    st.image("graphs/3.png", caption=" ", use_column_width=True)
+    st.image("graphs/4.png", caption=" ", use_column_width=True)
+    st.image("graphs/5.png", caption=" ", use_column_width=True)
+    st.image("graphs/6.png", caption=" ", use_column_width=True)
+    st.image("graphs/7.png", caption=" ", use_column_width=True)
