@@ -14,7 +14,11 @@ st.sidebar.title("Opciones")
 # Cargar el modelo
 model_options = [
     "LGCN_GAT_3_e64_nodes35300__BPR_hard.pt",
-    "LGCN_GAT_3_e64_nodes35300__BPR_random.pt"
+    "LGCN_GAT_3_e64_nodes35300__BPR_random.pt",
+    "LGCN_LGC_4_e64_nodes35300__BPR_hard.pt",
+    "LGCN_LGC_4_e64_nodes35300__BPR_random.pt",
+    "LGCN_SAGE_3_e64_nodes35300__BPR_hard.pt",
+    "LGCN_SAGE_3_e64_nodes35300__BPR_random.pt"
 ]
 model_name = st.sidebar.selectbox("Selecciona el modelo a cargar", model_options)
 
@@ -80,7 +84,7 @@ st.header("Recomendaciones de Canciones")
 if st.button("Generar Recomendaciones"):
     try:
         # Crear un subgrafo para pruebas si el grafo es muy grande
-        small_graph = graph.subgraph(list(graph.nodes)[:1000])  # 1000 nodos para pruebas
+        small_graph = graph.subgraph(list(graph.nodes)[:10000])  # 1000 nodos para pruebas
 
         # Crear mapeo de nodos
         node_map = {node: i for i, node in enumerate(small_graph.nodes)}
