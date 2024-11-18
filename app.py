@@ -7,6 +7,13 @@ import pickle
 import json
 import numpy as np
 import requests
+import time
+import matplotlib.pyplot as plt
+import re
+
+# Dictionary to store execution times for each model
+if 'model_times' not in st.session_state:
+    st.session_state.model_times = {}
 
 # Función para obtener el nombre de la canción desde la API de Spotify
 def get_track_name(track_uri, access_token):
@@ -116,46 +123,42 @@ if selected_playlist:
 
     # Predicción de canciones recomendadas
     st.header("Recomendaciones de Canciones")
+    # Add a section to generate recommendations and record execution times
     if st.button("Generar Recomendaciones"):
         try:
             small_graph = graph.subgraph(list(graph.nodes)[:10000])  # Subgrafo más manejable
-
-            # Crear mapeo de nodos
             node_map = {node: i for i, node in enumerate(small_graph.nodes)}
-
-            # Convertir nodos y aristas en tensores
             node_indices = torch.tensor([node_map[n] for n in small_graph.nodes], dtype=torch.long)
             edge_indices = torch.tensor(
                 [[node_map[src], node_map[dst]] for src, dst in small_graph.edges],
                 dtype=torch.long
             ).t()
 
+            # Start timing the recommendation generation
+            start_time = time.time()
+            
             # Generar predicciones con torch.no_grad()
             with torch.no_grad():
                 output = model(node_indices, edge_indices).detach().numpy()
 
-            # Recomendar canciones
-            playlist_track_set = set(playlist_tracks)
-            track_scores = {
-                track: np.linalg.norm(output[node_map[track]])
-                for track in small_graph.nodes
-                if small_graph.nodes[track]["node_type"] == "track" and track not in playlist_track_set
-            }
-            recommended_tracks = sorted(track_scores, key=track_scores.get, reverse=True)[:10]
+            # Record the time taken for the current model
+            elapsed_time = time.time() - start_time
+            st.session_state.model_times[model_name] = elapsed_time
+            
+            # Display the time in the main app interface
+            st.write(f"Tiempo para '{model_name}': {elapsed_time:.2f} segundos")
 
-            # Consultar nombres de canciones desconocidas en recomendaciones
-            for track in recommended_tracks:
-                track_name = small_graph.nodes[track].get("track_name", "Desconocido")
-                if track_name == "Desconocido" and "spotify:track:" in track:
-                    track_name, artist_name = get_track_name(track, access_token)
-                    small_graph.nodes[track]["track_name"] = track_name
-                    small_graph.nodes[track]["artist_name"] = artist_name
+            # Plot the comparative bar graph if there are at least two models
+            if len(st.session_state.model_times) > 1:
+                st.header("Comparativa de Tiempos de Recomendación entre Modelos")
+                fig, ax = plt.subplots()
+                ax.bar([re.sub(r'^(LGCN_(?:GAT|LGC|SAGE))_.*?(BPR_(?:hard|random)\.pt)$', r'\1_\2', name) for name in st.session_state.model_times.keys()], st.session_state.model_times.values(), color='skyblue')
+                ax.set_xlabel("Modelos")
+                ax.set_ylabel("Tiempo (segundos)")
+                ax.set_title("Comparativa de Tiempos de Recomendación")
+                ax.tick_params(axis='x', rotation=45)  # Rotate x labels for readability
+                st.pyplot(fig)
 
-            st.write("Canciones Recomendadas:")
-            for track in recommended_tracks:
-                track_name = small_graph.nodes[track].get("track_name", "Desconocido")
-                artist_name = small_graph.nodes[track].get("artist_name", "Desconocido")
-                st.write(f"- {track_name} - {artist_name}")
         except Exception as e:
             st.error(f"Error al generar recomendaciones: {e}")
 
