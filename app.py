@@ -57,7 +57,7 @@ except Exception as e:
 
 # Enriquecer el grafo con nombres de canciones
 json_path = "./spotify_million_playlist_dataset/data/mpd.slice.0-999.json"  # Cambiar según la ubicación del archivo JSON
-access_token = "BQAQU6MOlVm5sLE5sHC_hkchsj_gO_YDKRtSHPoB6l473aFU9bou7MmsH10x5UtrhSTKysrcvwtHBBofGiG6nwZRgUN-ZZIdUvS7qwwlR7exLIsIRhs"  # Cambia esto por un token válido
+access_token = "BQDPgV1Jrddjzb7bTQtp-tstz9-ieNCHmZYu2TAQzDrsjZAp_n0rrv5VspwVpAWJekAhurc1W001ertFy5zA8CS5Ek6PWB4APKdIxZnlqGOr5fpUpvM"
 
 try:
     with open(json_path, "r") as file:
