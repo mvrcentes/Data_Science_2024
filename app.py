@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import pickle
 import json
+import numpy as np
 
 # Configuración inicial de la app
 st.title("Recomendador de Canciones para Playlists de Spotify")
@@ -78,26 +79,36 @@ for track in playlist_tracks:
 st.header("Recomendaciones de Canciones")
 if st.button("Generar Recomendaciones"):
     try:
-        # Crear entrada para el modelo
-        nodes = list(graph.nodes)
-        edges = list(graph.edges)
-        node_map = {node: i for i, node in enumerate(nodes)}
+        # Crear un subgrafo para pruebas si el grafo es muy grande
+        small_graph = graph.subgraph(list(graph.nodes)[:1000])  # 1000 nodos para pruebas
+
+        # Crear mapeo de nodos
+        node_map = {node: i for i, node in enumerate(small_graph.nodes)}
 
         # Convertir nodos y aristas en tensores
-        node_indices = torch.tensor([node_map[n] for n in nodes], dtype=torch.long)
-        edge_indices = torch.tensor([[node_map[src], node_map[dst]] for src, dst in edges], dtype=torch.long).t()
+        node_indices = torch.tensor([node_map[n] for n in small_graph.nodes], dtype=torch.long)
+        edge_indices = torch.tensor(
+            [[node_map[src], node_map[dst]] for src, dst in small_graph.edges],
+            dtype=torch.long
+        ).t()
 
-        # Realizar predicción
-        output = model(node_indices, edge_indices).detach().numpy()
+        # Generar predicciones con torch.no_grad()
+        with torch.no_grad():
+            output = model(node_indices, edge_indices).detach().numpy()
 
-        # Recomendar canciones que no están en la playlist seleccionada
-        track_scores = {track: output[node_map[track]] for track in graph.nodes if graph.nodes[track]["node_type"] == "track" and track not in playlist_tracks}
+        # Recomendar canciones
+        playlist_track_set = set(playlist_tracks)  # Convertir a conjunto para comparar eficientemente
+        track_scores = {
+            track: np.linalg.norm(output[node_map[track]])  # Calcular la norma del vector
+            for track in small_graph.nodes
+            if small_graph.nodes[track]["node_type"] == "track" and track not in playlist_track_set
+        }
         recommended_tracks = sorted(track_scores, key=track_scores.get, reverse=True)[:10]
 
         st.write("Canciones Recomendadas:")
         for track in recommended_tracks:
-            track_name = graph.nodes[track].get("track_name", "Desconocido")
-            st.write(f"- {track}: {track_name}")
+            track_name = small_graph.nodes[track].get("track_name", "Desconocido")
+            st.write(f"- {track_name}")
     except Exception as e:
         st.error(f"Error al generar recomendaciones: {e}")
 
@@ -108,7 +119,15 @@ plt.figure(figsize=(12, 12))
 # Subgrafo con la playlist y sus canciones
 subgraph = graph.subgraph([selected_playlist] + playlist_tracks)
 
-# Dibujar el grafo
+# Dibujar el grafo con nombres
 pos = nx.spring_layout(subgraph)
-nx.draw(subgraph, pos, with_labels=True, node_size=700, node_color="skyblue")
+labels = {node: graph.nodes[node].get("track_name", node) for node in subgraph.nodes}
+nx.draw(
+    subgraph,
+    pos,
+    with_labels=True,
+    labels=labels,
+    node_size=700,
+    node_color="skyblue"
+)
 st.pyplot(plt)
