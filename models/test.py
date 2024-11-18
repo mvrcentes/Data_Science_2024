@@ -20,3 +20,5 @@ try:
     print(f"\nTotal de nodos en el grafo: {graph.number_of_nodes()}")
 except Exception as e:
     print(f"Error al cargar el archivo: {e}")
+
+
