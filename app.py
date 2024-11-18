@@ -18,9 +18,9 @@ def get_track_name(track_uri, access_token):
 
     if response.status_code == 200:
         track_info = response.json()
-        return track_info.get('name', "Desconocido")
+        return track_info.get('name', "Desconocido"), track_info.get('artists', [{}])[0].get('name', "Desconocido")
     else:
-        return "Desconocido"
+        return "Desconocido", "Desconocido"
 
 # Configuración inicial de la app
 st.title("Recomendador de Canciones para Playlists de Spotify")
@@ -65,17 +65,22 @@ try:
 
     # Crear un mapa de track_uri -> track_name y playlist_id -> playlist_name
     track_map = {}
+    track_artist_map = {}
     playlist_name_map = {}
     for playlist in data['playlists']:
-        playlist_name_map[f"playlist_{playlist['pid']}"] = playlist['name'].strip()
+        playlist_name = playlist['name'].strip()
+        if playlist_name:  # Excluir playlists sin nombre
+            playlist_name_map[f"playlist_{playlist['pid']}"] = playlist_name
         for track in playlist['tracks']:
             track_map[track['track_uri']] = track['track_name']
+            track_artist_map[track['track_uri']] = track['artist_name']
 
-    # Añadir nombres al grafo
+    # Añadir nombres y autores al grafo
     for node, attrs in graph.nodes(data=True):
         if attrs.get("node_type") == "track":
             track_uri = attrs["name"]
             attrs["track_name"] = track_map.get(track_uri, "Desconocido")
+            attrs["artist_name"] = track_artist_map.get(track_uri, "Desconocido")
 
     st.sidebar.success("Grafo enriquecido con nombres de canciones.")
 except Exception as e:
@@ -83,10 +88,10 @@ except Exception as e:
 
 # Extraer playlists y mapear sus nombres desde el JSON
 playlists = [node for node, attrs in graph.nodes(data=True) if attrs["node_type"] == "playlist"]
-playlist_names = {playlist: playlist_name_map.get(playlist, "Sin Nombre") for playlist in playlists}
+playlist_names = {playlist: playlist_name_map.get(playlist) for playlist in playlists if playlist_name_map.get(playlist)}
 
 # Seleccionar una playlist
-selected_playlist = st.sidebar.selectbox("Selecciona una Playlist", playlists, format_func=lambda x: playlist_names[x])
+selected_playlist = st.sidebar.selectbox("Selecciona una Playlist", playlist_names.keys(), format_func=lambda x: playlist_names[x])
 
 # Verificar si se ha seleccionado una playlist
 if selected_playlist:
@@ -97,15 +102,17 @@ if selected_playlist:
     for track in playlist_tracks:
         track_name = graph.nodes[track].get("track_name", "Desconocido")
         if track_name == "Desconocido" and "spotify:track:" in graph.nodes[track]["name"]:
-            graph.nodes[track]["track_name"] = get_track_name(graph.nodes[track]["name"], access_token)
+            track_name, artist_name = get_track_name(graph.nodes[track]["name"], access_token)
+            graph.nodes[track]["track_name"] = track_name
+            graph.nodes[track]["artist_name"] = artist_name
 
     # Visualizar canciones en la playlist
     st.header(f"Playlist Seleccionada: {playlist_names[selected_playlist]}")
-    st.write(f"Playlist ID: {selected_playlist}")
     st.write("Canciones en la Playlist:")
     for track in playlist_tracks:
         track_name = graph.nodes[track].get("track_name", "Desconocido")
-        st.write(f"- {track}: {track_name}")
+        artist_name = graph.nodes[track].get("artist_name", "Desconocido")
+        st.write(f"- {track_name} - {artist_name}")
 
     # Predicción de canciones recomendadas
     st.header("Recomendaciones de Canciones")
@@ -140,12 +147,15 @@ if selected_playlist:
             for track in recommended_tracks:
                 track_name = small_graph.nodes[track].get("track_name", "Desconocido")
                 if track_name == "Desconocido" and "spotify:track:" in track:
-                    small_graph.nodes[track]["track_name"] = get_track_name(track, access_token)
+                    track_name, artist_name = get_track_name(track, access_token)
+                    small_graph.nodes[track]["track_name"] = track_name
+                    small_graph.nodes[track]["artist_name"] = artist_name
 
             st.write("Canciones Recomendadas:")
             for track in recommended_tracks:
                 track_name = small_graph.nodes[track].get("track_name", "Desconocido")
-                st.write(f"- {track_name}")
+                artist_name = small_graph.nodes[track].get("artist_name", "Desconocido")
+                st.write(f"- {track_name} - {artist_name}")
         except Exception as e:
             st.error(f"Error al generar recomendaciones: {e}")
 
@@ -154,7 +164,10 @@ if selected_playlist:
     plt.figure(figsize=(12, 12))
     subgraph = graph.subgraph([selected_playlist] + playlist_tracks)
     pos = nx.spring_layout(subgraph)
-    labels = {node: graph.nodes[node].get("track_name", node) for node in subgraph.nodes}
+    labels = {
+        node: f"{graph.nodes[node].get('track_name', node).replace('$', '\\$')}\n{graph.nodes[node].get('artist_name', '').replace('$', '\\$')}"
+        for node in subgraph.nodes
+    }
     nx.draw(
         subgraph,
         pos,
